@@ -48,7 +48,7 @@ The Dutchman page in Edit > Preferences.
 The Addon Manager flags a new add-on release as an update when it can run `git`. On Linux and
 macOS that is normally the case. On Windows without Git installed, the Addon Manager shows
 **Can't check** for this add-on and never offers the update: install Git for Windows, or
-open the add-on in the Addon Manager, uninstall it and install it again, then restart FreeCAD.
+uninstall the add-on in the Addon Manager and install it again, then restart FreeCAD (the reinstall route was not tried on Windows).
 Updating from 0.1.6 to 0.1.7 was checked this way on Linux (update offered, installed, new
 version active after the update), on macOS (installed copy ended at 0.1.7), and on Windows
 (not offered, as described).
