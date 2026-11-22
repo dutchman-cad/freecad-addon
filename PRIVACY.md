@@ -14,7 +14,7 @@ local executable; it does not contact the release service or install software.
 The release installer requests public release metadata from `api.github.com`
 and checksums and a selected OS/architecture archive from GitHub release URLs.
 GitHub may redirect archive requests to its download infrastructure. Those
-services receive your IP address, a `Dutchman-FreeCAD/0.1.6` user agent, and the
+services receive your IP address, a `Dutchman-FreeCAD/0.1.7` user agent, and the
 requested URLs, which identify the selected release and platform archive. Your
 system's configured HTTP proxy, if any, may also observe these requests.
 No account, access token, or saved credentials are requested or used by the addon.

@@ -79,23 +79,27 @@ def resolve(configured="", install_dir=None, auto_download=False, confirm=None, 
     raise BinaryNotFound(message, declined)
 
 
-def _read(url, progress=None, label=""):
-    """Fetch url; report (label, bytes_done, bytes_total_or_0) to progress as it arrives.
-
-    The progress callback may raise to cancel the transfer.
-    """
-    request = urllib.request.Request(url, headers={"User-Agent": "Dutchman-FreeCAD/0.1.6"})
+def _open(url):
+    request = urllib.request.Request(url, headers={"User-Agent": "Dutchman-FreeCAD/0.1.7"})
     try:
-        response = urllib.request.urlopen(request, timeout=120)
+        return urllib.request.urlopen(request, timeout=120)
     except (urllib.error.URLError, OSError) as error:
         reason = getattr(error, "reason", error)
         raise DownloadFailed(
             "Dutchman could not be downloaded ({}). Check your internet connection and try "
             "again, or install Dutchman yourself and set its path in Edit > Preferences > "
             "Dutchman.".format(reason)) from error
-    with response:
+
+
+def _stream(url, sink, progress=None, label=""):
+    """Fetch url in 1 MB chunks, passing each to sink; report (label, done, total) as it goes.
+
+    The release archives are hundreds of MB, so nothing here keeps the whole body in memory.
+    The progress callback may raise to cancel the transfer.
+    """
+    with _open(url) as response:
         total = int(response.headers.get("Content-Length") or 0)
-        chunks, done = [], 0
+        done = 0
         if progress:
             progress(label, 0, total)
         while True:
@@ -108,11 +112,17 @@ def _read(url, progress=None, label=""):
                     .format(error)) from error
             if not chunk:
                 break
-            chunks.append(chunk)
+            sink(chunk)
             done += len(chunk)
             if progress:
                 progress(label, done, total)
-        return b"".join(chunks)
+
+
+def _read(url, progress=None, label=""):
+    """Fetch a small url (release metadata, checksums) into memory."""
+    chunks = []
+    _stream(url, chunks.append, progress, label)
+    return b"".join(chunks)
 
 
 def select_asset(assets, system=None, machine=None):
@@ -149,23 +159,37 @@ def _expected_checksum(contents, archive_name, single=False):
     raise BinaryError("Release checksum file does not contain the selected archive")
 
 
-def _unpack_executable(data, archive_name):
-    """Read only the regular executable member; never extract archive paths."""
+def _unpack_to(source, archive_name, target):
+    """Copy only the one regular executable member of the archive into the open file `target`.
+
+    `source` is a path or a file object. Never extracts archive paths.
+    """
     expected = executable_name()
     if archive_name.lower().endswith(".zip"):
-        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        with zipfile.ZipFile(source) as archive:
             members = [m for m in archive.infolist() if Path(m.filename).name == expected
                        and not m.is_dir() and not stat.S_ISLNK(m.external_attr >> 16)]
             if len(members) == 1:
-                return archive.read(members[0])
+                with archive.open(members[0]) as stream:
+                    shutil.copyfileobj(stream, target, 1 << 20)
+                return
     else:
-        with tarfile.open(fileobj=io.BytesIO(data), mode="r:*") as archive:
+        opener = ({"fileobj": source} if hasattr(source, "read") else {"name": str(source)})
+        with tarfile.open(mode="r:*", **opener) as archive:
             members = [m for m in archive.getmembers()
                        if Path(m.name).name == expected and m.isfile()]
             if len(members) == 1:
                 with archive.extractfile(members[0]) as stream:
-                    return stream.read()
+                    shutil.copyfileobj(stream, target, 1 << 20)
+                return
     raise BinaryError("Release archive must contain exactly one regular Dutchman executable")
+
+
+def _unpack_executable(data, archive_name):
+    """In-memory convenience wrapper around _unpack_to (used for small archives and tests)."""
+    out = io.BytesIO()
+    _unpack_to(io.BytesIO(data), archive_name, out)
+    return out.getvalue()
 
 
 def download_release(install_dir, api_url=RELEASE_API, system=None, machine=None, progress=None):
@@ -192,23 +216,37 @@ def download_release(install_dir, api_url=RELEASE_API, system=None, machine=None
             continue
     if expected is None:
         raise BinaryError("Release checksum file does not contain the selected archive")
-    data = _read(archive["browser_download_url"], progress, "Downloading Dutchman")
-    if hashlib.sha256(data).hexdigest() != expected:
-        raise BinaryError("Dutchman archive SHA-256 checksum mismatch; download refused")
-    payload = _unpack_executable(data, archive["name"])
     destination = Path(install_dir)
+    existed = destination.exists()
     destination.mkdir(parents=True, exist_ok=True)
+    installed = False
     target = destination / executable_name()
-    temporary = None
+    # The archive and the unpacked executable both go to files beside the destination, so a
+    # 300+ MB release costs disk, not memory, and a failure leaves nothing behind.
+    scratch = Path(tempfile.mkdtemp(prefix=".download-", dir=destination))
     try:
-        with tempfile.NamedTemporaryFile(dir=destination, delete=False) as stream:
-            temporary = Path(stream.name)
-            stream.write(payload)
-        temporary.chmod(0o755)
-        os.replace(temporary, target)
+        digest = hashlib.sha256()
+        downloaded = scratch / "archive"
+        with downloaded.open("wb") as stream:
+            def sink(chunk):
+                digest.update(chunk)
+                stream.write(chunk)
+            _stream(archive["browser_download_url"], sink, progress, "Downloading Dutchman")
+        if digest.hexdigest() != expected:
+            raise BinaryError("Dutchman archive SHA-256 checksum mismatch; download refused")
+        unpacked = scratch / "executable"
+        with unpacked.open("wb") as stream:
+            _unpack_to(downloaded, archive["name"], stream)
+        unpacked.chmod(0o755)
+        os.replace(unpacked, target)
+        installed = True
     finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
+        shutil.rmtree(scratch, ignore_errors=True)
+        if not installed and not existed:
+            try:
+                destination.rmdir()
+            except OSError:
+                pass
     return target
 
 

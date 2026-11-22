@@ -122,6 +122,10 @@ class ReleaseTests(unittest.TestCase):
         # The synthetic server sends no Content-Length, so the total is unknown (0).
         self.assertEqual(events[-1], ("Downloading Dutchman", len(self.archive), 0))
 
+    def test_successful_download_leaves_only_the_executable(self):
+        self.download()
+        self.assertEqual([p.name for p in self.destination.iterdir()], [binary.executable_name()])
+
     def test_cancel_from_progress_leaves_nothing_installed(self):
         def progress(label, done, total):
             if label == "Downloading Dutchman":
