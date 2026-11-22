@@ -25,6 +25,24 @@ rebuild macro; the addon executes that macro and displays its JSON report.
 4. **Read the report.** The **Dutchman import report** panel opens on the right and says what
    was imported, what was lost, and where to get help.
 
+## Screenshots
+
+![The add-on installed from a custom repository in FreeCAD's Addon Manager](docs/images/addon-manager.png)
+
+The add-on installed from a custom repository in the Addon Manager.
+
+![A Fusion design opened through File > Open, with the Dutchman import report on the right](docs/images/import-report.png)
+
+A design opened with File > Open, with the import report beside it.
+
+![A second file imported into the open document with File > Import](docs/images/import-into-document.png)
+
+File > Import adds a second file to the open document.
+
+![Edit > Preferences > Dutchman: program path, download offer and saved-copy folder](docs/images/preferences.png)
+
+The Dutchman page in Edit > Preferences.
+
 ## Installation details
 
 The runtime package uses the modern `freecad/dutchman_freecad` namespace layout.
