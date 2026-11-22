@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Drive real FreeCAD widgets; capture display externally with ImageMagick."""
+import json
+import os
+from pathlib import Path
+import traceback
+import FreeCAD as App
+import FreeCADGui as Gui
+from PySide import QtCore, QtGui, QtWidgets
+
+out = Path(os.environ['WALK_DIR'])
+root = Path(os.environ['WALK_ROOT'])
+main = Gui.getMainWindow()
+main.resize(1400, 950)
+
+
+def dump(name):
+    rows = []
+    for w in QtWidgets.QApplication.allWidgets():
+        if w.isVisible():
+            text = ''
+            for prop in ('text', 'title', 'windowTitle'):
+                try:
+                    value = getattr(w, prop)()
+                    if value:
+                        text += str(value)[:300] + ' '
+                except (AttributeError, TypeError):
+                    pass
+            rows.append([w.metaObject().className(), w.objectName(), text])
+    (out / (name + '.json')).write_text(json.dumps(rows, indent=2))
+
+
+def shot(name):
+    dump(name)
+    pending = out / 'shot-next'
+    pending.write_text(name)
+    pending.replace(out / 'shot-request')
+
+
+def click(widget):
+    point = widget.mapToGlobal(widget.rect().center())
+    pending = out / 'action-next'
+    pending.write_text('click {} {}\n'.format(point.x(), point.y()))
+    pending.replace(out / 'action-request')
+
+
+def action(name):
+    a = main.findChild(getattr(QtGui, 'QAction', None) or QtWidgets.QAction, name)
+    if a is None:
+        raise AssertionError('Missing action ' + name)
+    a.trigger()
+
+
+def steps():
+    (out / 'version.txt').write_text(str(App.Version()) + '\n' + App.getUserAppDataDir())
+    assert App.Version()[:3] == ['1', '1', '4'], App.Version()
+    assert App.getUserAppDataDir().startswith(os.environ['WALK_PRIVATE']), 'Profile is not private'
+    shot('01-fresh-start')
+    yield 2
+    QtCore.QTimer.singleShot(0, lambda: action('Std_AddonMgr'))
+    yield 25
+    shot('02-addon-manager')
+    yield 2
+    # Dump real widgets and Addon Manager sources before selecting settings.
+    for mod in list(__import__('sys').modules.values()):
+        path = getattr(mod, '__file__', '') or ''
+        if 'addonmanager' in path.lower() and path.endswith('.py'):
+            try:
+                destination = out / 'manager-source' / Path(path).name
+                destination.parent.mkdir(exist_ok=True)
+                destination.write_text(Path(path).read_text())
+            except OSError:
+                pass
+    yield 1
+
+
+walk_steps = steps()
+
+
+def advance():
+    try:
+        delay = next(walk_steps)
+        QtCore.QTimer.singleShot(int(delay * 1000), advance)
+    except StopIteration:
+        (out / 'finished').write_text('completed\n')
+        os._exit(0)
+    except BaseException:
+        (out / 'error.txt').write_text(traceback.format_exc())
+        shot('99-error')
+        QtCore.QTimer.singleShot(2000, lambda: os._exit(1))
+
+
+QtCore.QTimer.singleShot(10000, advance)

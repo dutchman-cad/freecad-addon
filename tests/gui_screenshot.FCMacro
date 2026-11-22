@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0
+import os
+from pathlib import Path
+import sys
+import traceback
+
+root = Path(os.environ.get("ADDON_ROOT", os.getcwd()))
+sys.path.insert(0, str(root))
+sys.path.insert(0, str(root / "tests"))
+try:
+    import FreeCADGui
+    assert "freecad.dutchman_freecad.init_gui" in sys.modules, "Addon GUI startup was not discovered"
+    preferences = FreeCADGui.PySideUic.loadUi(
+        str(root / "freecad" / "dutchman_freecad" / "resources" / "panels" / "DutchmanPrefs.ui"))
+    assert hasattr(preferences, "binaryPath") and hasattr(preferences, "autoDownload")
+    assert hasattr(preferences, "outputFolder"), "Native preferences form did not load"
+    preferences.close()
+    os.environ["DUTCHMAN_TEST_LIBRARY"] = "1"
+    from freecad_import_test import run
+    from freecad.dutchman_freecad.gui import qt
+    run()
+    FreeCADGui.getMainWindow().resize(1280, 900)
+    core, widgets = qt()
+
+    def capture():
+        try:
+            destination = root / "out" / "dutchman-report.png"
+            destination.parent.mkdir(exist_ok=True)
+            assert FreeCADGui.getMainWindow().grab().save(str(destination)), "Screenshot failed"
+            print("GUI screenshot saved", flush=True)
+            os._exit(0)
+        except BaseException:
+            traceback.print_exc()
+            sys.stderr.flush()
+            os._exit(1)
+
+    core.QTimer.singleShot(1500, capture)
+except BaseException:
+    traceback.print_exc()
+    sys.stderr.flush()
+    os._exit(1)

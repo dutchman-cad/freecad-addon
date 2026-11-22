@@ -1,0 +1,7 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="2" y="2" width="60" height="60" rx="12" fill="#15354b"/>
+  <path d="M16 14h15c13 0 21 7 21 18S44 50 31 50H16z" fill="#ef9a36"/>
+  <path d="M25 23h6c8 0 12 3 12 9s-4 9-12 9h-6z" fill="#15354b"/>
+  <path d="M8 32h25m-7-7 7 7-7 7" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

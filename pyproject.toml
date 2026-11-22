@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dutchman-freecad"
+version = "0.1.6"
+description = "Dutchman CAD importers and conversion reports for FreeCAD"
+requires-python = ">=3.9"
+license = {text = "Apache-2.0"}
+authors = [{name = "Dutchman CAD", email = "hello@dutchmancad.xyz"}]
+maintainers = [{name = "Dutchman CAD", email = "hello@dutchmancad.xyz"}]
+
+[project.urls]
+Repository = "https://github.com/dutchman-cad/freecad-addon"
+Issues = "https://github.com/dutchman-cad/freecad-addon/issues"
+
+[tool.setuptools.packages.find]
+include = ["freecad.dutchman_freecad*"]
+namespaces = true
+
+[tool.setuptools.package-data]
+"freecad.dutchman_freecad" = ["resources/icons/*.svg", "resources/panels/*.ui"]
