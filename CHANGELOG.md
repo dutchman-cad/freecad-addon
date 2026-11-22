@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.7
+
+- The Dutchman download is written to disk as it arrives and unpacked from that file, instead of being held in memory two or three times over. The release archives are 280 to 390 MB, which was over a gigabyte of RAM at peak on a small machine.
+
 ## 0.1.6
 
 - A failed Dutchman download (no connection, interrupted transfer) now says so in plain words and points to Edit > Preferences > Dutchman, instead of showing a raw network error.
